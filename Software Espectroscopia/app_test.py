@@ -53,7 +53,7 @@ class EspectroscopiaApp:
         self.label_imagem = tk.Label(self.main_frame)
         self.label_imagem.pack()
         
-    def carregar_imagem(self):
+    def carregar_imagem(self, value = None):
         
         filename = filedialog.askopenfilename(
             filetypes=[("Imagens", "*.jpg *.png *.jpeg"), ("Todos arquivos", "*.*")]
@@ -61,19 +61,34 @@ class EspectroscopiaApp:
         if not filename:
             return
         
-        self.img_arr = cv2.imread(filename)
-        self.img_arr = cv2.cvtColor(self.img_arr, cv2.COLOR_BGR2RGB)
-        
-        self.img = Image.fromarray(self.img_arr)
-        self.img = self.img.resize((875, 45))
+        if value == 0:
+            self.img_arr = cv2.imread(filename)
+            self.img_arr = cv2.cvtColor(self.img_arr, cv2.COLOR_BGR2RGB)
             
-        imagetk = ImageTk.PhotoImage(image=self.img)                
-        self.label_imagem.config(image=imagetk)
-        self.label_imagem.image = imagetk
+            self.img = Image.fromarray(self.img_arr)
+            self.img = self.img.resize((875, 45))
+                
+            imagetk = ImageTk.PhotoImage(image=self.img)                
+            self.label_imagem.config(image=imagetk)
+            self.label_imagem.image = imagetk
+        elif value == 1:
+            self.img_arr = cv2.imread(filename)
+            self.img_arr = cv2.cvtColor(self.img_arr, cv2.COLOR_BGR2RGB)
+            
+            self.img = Image.fromarray(self.img_arr)
+            self.img = self.img.resize((875, 45))
+            self.img = self.img.rotate(360)    
+                
+            imagetk = ImageTk.PhotoImage(image=self.img)                
+            self.label_imagem.config(image=imagetk)
+            self.label_imagem.image = imagetk
+        else:
+            print("Valor não definido!")
+        
         
     def plotar_espectro_rgb(self):
         
-        self.carregar_imagem()
+        self.carregar_imagem(value=0)
         
         if self.canvas:
             self.canvas.get_tk_widget().destroy()
@@ -105,7 +120,7 @@ class EspectroscopiaApp:
         #self.toolbar.update()
             
     def plotar_espectro_continuo(self):
-        self.carregar_imagem()
+        self.carregar_imagem(value=1)
         
         if self.canvas:
             self.canvas.get_tk_widget().destroy()
