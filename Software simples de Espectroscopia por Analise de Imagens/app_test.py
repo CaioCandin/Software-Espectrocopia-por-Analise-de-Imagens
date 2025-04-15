@@ -111,13 +111,14 @@ class EspectroscopiaApp:
         ax.set_xlabel("Posição Horizontal na Imagem")
         ax.set_ylabel("Intensidade Normalizada")
         ax.legend()
+        ax.grid(True)
             
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_graph)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             
-        #self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
-        #self.toolbar.update()
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
+        self.toolbar.update()
             
     def plotar_espectro_continuo(self):
         self.carregar_imagem(value=1)
@@ -128,33 +129,28 @@ class EspectroscopiaApp:
             self.toolbar.destroy()
         
         try:
-            # Obter dimensões da imagem
             altura, largura, _ = self.img_arr.shape
         
-            # 1. Coletar valores RGB para cada posição horizontal
             R = np.array([np.mean(self.img_arr[:, x, 0])/255 for x in range(largura)])
             G = np.array([np.mean(self.img_arr[:, x, 1])/255 for x in range(largura)])
             B = np.array([np.mean(self.img_arr[:, x, 2])/255 for x in range(largura)])
             
-            # 2. Obter dados CMFS
-            cmfs = colour.MSDS_CMFS["CIE 1931 2 Degree Standard Observer"]
+            cmfs = colour.MSDS_CMFS["CIE 2015 10 Degree Standard Observer"]
             wavelengths = cmfs.wavelengths
             s_r = cmfs.values[:, 0]
             s_g = cmfs.values[:, 1]
             s_b = cmfs.values[:, 2]
             
-            # 3. Mapear posições horizontais para comprimentos de onda
             comprimentos_onda_mapeados = np.linspace(380, 780, largura)
             
-            # 4. Interpolar os valores CMFS para corresponder à resolução da imagem
+            sd = colour.SpectralDistribution()
+            
             s_r_interp = np.interp(comprimentos_onda_mapeados, wavelengths, s_r)
             s_g_interp = np.interp(comprimentos_onda_mapeados, wavelengths, s_g)
             s_b_interp = np.interp(comprimentos_onda_mapeados, wavelengths, s_b)
             
-            # 5. Calcular o espectro para cada posição
             espectro = (R * s_r_interp + G * s_g_interp + B * s_b_interp)
             
-            # 6. Criar o gráfico
             self.fig = plt.Figure(figsize=(9, 4), dpi=100)
             ax = self.fig.add_subplot(111)
             ax.plot(comprimentos_onda_mapeados, espectro, color='darkviolet')
