@@ -1,6 +1,6 @@
 import cv2
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
 from PIL import Image, ImageTk
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,11 +8,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import colour
 from colour.plotting import *
 from scipy.signal import find_peaks
+import pandas as pd
 
 class EspectroscopiaApp:
     def __init__(self, root):
         self.root = root
-        self.root.geometry('1200x700')
+        self.root.geometry('800x600')
         self.root.title('Software de Espectroscopia')
         self.root.configure(bg='#f0f0f0')
         
@@ -27,37 +28,50 @@ class EspectroscopiaApp:
         self.main_frame = tk.Frame(self.root, bg='#f0f0f0')
         self.main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
+        self.botoes_frame = tk.Frame(self.main_frame, bg='#f0f0f0')
+        self.botoes_frame.pack(pady=10)
+
         self.botao1 = tk.Button(
-            self.main_frame,
-            text='Espectro RGB',
-            command=self.plotar_espectro_rgb,
+        self.botoes_frame,
+        text='Espectro RGB',
+        command=self.plotar_espectro_rgb,
         )
-        self.botao1.pack(pady= 10)
-       
+        self.botao1.grid(row=0, column=0, padx=5)
+
         self.botao2 = tk.Button(
-            self.main_frame,
+            self.botoes_frame,
             text='Espectro continuo',
             command=self.plotar_espectro_continuo,
         )
-        self.botao2.pack(pady= 1)
-        
+        self.botao2.grid(row=0, column=1, padx=5)
+
         self.botao3 = tk.Button(
-            self.main_frame,
+            self.botoes_frame,
             text='CFMS',
             command=self.plot_single_cmfs
         )
-        self.botao3.pack(pady= 1)
+        self.botao3.grid(row=0, column=2, padx=5)
         
-#        self.botao4 = tk.Button(
-#            self.main_frame,
-#            text='Absorbance',
-#            command=self.absorbance
-#        )
-#        self.botao4.pack(pady= 1)
+        self.botao4 = tk.Button(
+            self.botoes_frame,
+            text='Extrair Dados',
+            command=self.extrair_dados
+        )
+        self.botao4.grid(row=0, column=3, padx=5)
         
-        self.frame_graph = tk.Frame(self.main_frame, bg='white')
+        self.frame_graph = tk.Frame(self.main_frame, bg='white', highlightbackground="gray", highlightthickness=1)
         self.frame_graph.pack(fill=tk.BOTH, expand=True)
-        
+        self.status_frame = ttk.Frame(self.root)
+
+        self.status_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=5, pady=5)
+
+        self.status_label = ttk.Label(
+            self.status_frame,
+            text="Pronto",
+            anchor=tk.W
+        )
+        self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
         self.label_imagem = tk.Label(self.main_frame)
         self.label_imagem.pack()
         
@@ -68,7 +82,7 @@ class EspectroscopiaApp:
             bounding_box=(390, 870, 0, 1.1),
         )
     
-    def carregar_imagem(self, value = None):
+    def carregar_imagem(self):
         
         filename = filedialog.askopenfilename(
             filetypes=[("Imagens", "*.jpg *.png *.jpeg"), ("Todos arquivos", "*.*")]
@@ -88,7 +102,7 @@ class EspectroscopiaApp:
             
     def plotar_espectro_rgb(self):
         
-        self.carregar_imagem(value=0)
+        self.carregar_imagem()
         
         if self.canvas:
             self.canvas.get_tk_widget().destroy()
@@ -142,16 +156,16 @@ class EspectroscopiaApp:
             self.s_g_interp = np.interp(self.comprimentos_onda_mapeados, wavelengths, s_g)
             self.s_b_interp = np.interp(self.comprimentos_onda_mapeados, wavelengths, s_b)
             
-            espectro = (self.espectro_r * self.s_r_interp + self.espectro_g * self.s_g_interp + self.espectro_b * self.s_b_interp)
+            self.espectro = (self.espectro_r * self.s_r_interp + self.espectro_g * self.s_g_interp + self.espectro_b * self.s_b_interp)
 
-            espectro /=  np.max(espectro)
+            self.espectro /=  np.max(self.espectro)
             
-            picos = find_peaks(espectro)
+            picos = find_peaks(self.espectro)
             
             self.fig = plt.Figure(figsize=(9, 4), dpi=100)
             ax = self.fig.add_subplot(111)
-            ax.plot(self.comprimentos_onda_mapeados, espectro, color='darkviolet')
-            ax.scatter(self.comprimentos_onda_mapeados[picos[0]], espectro[picos[0]], color='black', alpha = 1)
+            ax.plot(self.comprimentos_onda_mapeados, self.espectro, color='darkviolet')
+            ax.scatter(self.comprimentos_onda_mapeados[picos[0]], self.espectro[picos[0]], color='black', alpha = 1)
             
             ax.set_xlabel("Comprimento de Onda (nm)")
             ax.set_ylabel("Intensidade Relativa")
@@ -169,52 +183,14 @@ class EspectroscopiaApp:
         except Exception as e:
             tk.messagebox.showerror("Erro", f"Falha ao gerar espectro:\n{str(e)}")
         
-#    def absorbance(self):
-#        self.carregar_imagem(value=1)
-#    
-#        if self.canvas:
-#            self.canvas.get_tk_widget().destroy()
-#        if self.toolbar:
-#            self.toolbar.destroy()
-#        
-#        try:
-#            
-#            iluminantes = colour.SDS_ILLUMINANTS['D65']
-#            iluminantes_interp = np.interp(self.comprimentos_onda_mapeados, iluminantes.wavelengths, iluminantes.values)     
-#            
-#            R_c = np.maximum(np.sum(iluminantes_interp * self.s_r_interp), 1e-6)
-#            G_c = np.maximum(np.sum(iluminantes_interp * self.s_g_interp), 1e-6)
-#            B_c = np.maximum(np.sum(iluminantes_interp * self.s_b_interp), 1e-6)
-#            
-#            R = np.clip(self.espectro_r, 1e-6, 1.0)
-#            G = np.clip(self.espectro_g, 1e-6, 1.0)
-#            B = np.clip(self.espectro_b, 1e-6, 1.0)
-#            
-#            R_absorbance = -np.log10(R/R_c)
-#            G_absorbance = -np.log10(G/G_c)            
-#            B_absorbance = -np.log10(B/B_c)
-#            absorbance = (R_absorbance + G_absorbance + B_absorbance) / 3
-#
-#            self.fig = plt.Figure(figsize=(9, 4), dpi=100)
-#            ax = self.fig.add_subplot(111)
-#            
-#            ax.plot(self.comprimentos_onda_mapeados, absorbance, color='darkviolet')
-#            ax.set_xlabel("Comprimento de Onda (nm)")
-#            ax.set_ylabel("Intensidade Relativa")
-#            ax.set_title("Espectro Estimado")
-#            ax.set_xlim(380, 780)
-#            ax.grid(True, alpha=0.3)
-#            
-#            self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_graph)
-#            self.canvas.draw()
-#            self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-#            
-#            self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
-#            self.toolbar.update()
-#
-#        except Exception as e:
-#            tk.messagebox.showerror("Erro", f"Falha ao executar o comando:\n{str(e)}")
-        
+    def extrair_dados(self):
+        self.status_label.config(text="Exportando CSV...")
+
+        self.dados = np.column_stack((self.comprimentos_onda_mapeados, self.espectro))
+        file_path = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV", "*.csv")])
+        if file_path:
+            np.savetxt(file_path, self.dados, delimiter=",", fmt="%.4f")
+            self.status_label.config(text=f"CSV exportado: {file_path}")            
         
 if __name__ == "__main__":
     root = tk.Tk()
