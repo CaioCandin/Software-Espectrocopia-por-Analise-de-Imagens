@@ -8,12 +8,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import colour
 from colour.plotting import *
 from scipy.signal import find_peaks
-import pandas as pd
+from scipy.optimize import curve_fit
 
 class EspectroscopiaApp:
     def __init__(self, root):
         self.root = root
-        self.root.geometry('800x600')
+        self.root.geometry('1200x628')
         self.root.title('Software de Espectroscopia')
         self.root.configure(bg='#f0f0f0')
         
@@ -23,6 +23,8 @@ class EspectroscopiaApp:
         self.toolbar = None
         
         self.criar_interface()
+        
+   
         
     def criar_interface(self):
         self.main_frame = tk.Frame(self.root, bg='#f0f0f0')
@@ -47,11 +49,11 @@ class EspectroscopiaApp:
 
         self.botao3 = tk.Button(
             self.botoes_frame,
-            text='CFMS',
-            command=self.plot_single_cmfs
+            text='Gray Scale',
+            command=self.plotar_escala_cinza
         )
         self.botao3.grid(row=0, column=2, padx=5)
-        
+
         self.botao4 = tk.Button(
             self.botoes_frame,
             text='Extrair Dados',
@@ -59,6 +61,13 @@ class EspectroscopiaApp:
         )
         self.botao4.grid(row=0, column=3, padx=5)
         
+        self.botao5 = tk.Button(
+            self.botoes_frame,
+            text='CFMS',
+            command=self.plot_single_cmfs
+        )
+        self.botao5.grid(row=0, column=4, padx=5)
+            
         self.frame_graph = tk.Frame(self.main_frame, bg='white', highlightbackground="gray", highlightthickness=1)
         self.frame_graph.pack(fill=tk.BOTH, expand=True)
         self.status_frame = ttk.Frame(self.root)
@@ -67,20 +76,27 @@ class EspectroscopiaApp:
 
         self.status_label = ttk.Label(
             self.status_frame,
-            text="Pronto",
+            text="",
             anchor=tk.W
         )
         self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
         self.label_imagem = tk.Label(self.main_frame)
         self.label_imagem.pack()
-        
+
     def plot_single_cmfs(self):
         plot_single_cmfs(
-           "Stockman & Sharpe 2 Degree Cone Fundamentals",
+           "CIE 1931 2 Degree Standard Observer",
             y_label="Sensitivity",
             bounding_box=(390, 870, 0, 1.1),
         )
+        
+    def calibrar_com_mercurio(self):
+        filename = filedialog.askopenfilename(
+            filetypes=[("Imagens", "*.jpg *.png *.jpeg")]
+        )
+        if not filename:
+            return
     
     def carregar_imagem(self):
         
@@ -92,6 +108,7 @@ class EspectroscopiaApp:
         
         self.img_arr = cv2.imread(filename)
         self.img_arr = cv2.cvtColor(self.img_arr, cv2.COLOR_BGR2RGB)
+        self.img_arr = cv2.GaussianBlur(self.img_arr, (5,5), 0)
         
         self.img = Image.fromarray(self.img_arr)
         self.img = self.img.resize((775, 45))
@@ -101,7 +118,7 @@ class EspectroscopiaApp:
         self.label_imagem.image = imagetk    
             
     def plotar_espectro_rgb(self):
-        
+            
         self.carregar_imagem()
         
         if self.canvas:
@@ -117,8 +134,8 @@ class EspectroscopiaApp:
         self.fig = plt.Figure(figsize=(9, 4))
         ax = self.fig.add_subplot(111)
                 
-        ax.plot(self.espectro_r, color='red')#, label="Vermelho (R)")
-        ax.plot(self.espectro_g, color='green')#, label="Verde (G)")
+        ax.plot(self.espectro_r, color = 'red')#, label="Vermelho (R)")
+        ax.plot(self.espectro_g, color = 'green')#, label="Verde (G)")
         ax.plot(self.espectro_b, color='blue')#, label="Azul (B)")
             
         ax.set_title("Espectroscopia RGB da Imagem", fontsize=12)
@@ -131,8 +148,8 @@ class EspectroscopiaApp:
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             
-        #self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
-        #self.toolbar.update()
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
+        self.toolbar.update()
             
     def plotar_espectro_continuo(self):
 
@@ -142,9 +159,9 @@ class EspectroscopiaApp:
             self.toolbar.destroy()
         
         try:
-            altura, self.largura, _ = self.img_arr.shape
+            self.altura, self.largura, _ = self.img_arr.shape
             
-            cmfs = colour.MSDS_CMFS["Stockman & Sharpe 2 Degree Cone Fundamentals"]
+            cmfs = colour.MSDS_CMFS["CIE 1931 2 Degree Standard Observer"]
             wavelengths = cmfs.wavelengths
             s_r = cmfs.values[:, 0]
             s_g = cmfs.values[:, 1]
@@ -158,18 +175,15 @@ class EspectroscopiaApp:
             
             self.espectro = (self.espectro_r * self.s_r_interp + self.espectro_g * self.s_g_interp + self.espectro_b * self.s_b_interp)
 
-            self.espectro /=  np.max(self.espectro)
-            
-            picos = find_peaks(self.espectro)
+            picos, _ = find_peaks(self.espectro, prominence=0.1, width=5)
             
             self.fig = plt.Figure(figsize=(9, 4), dpi=100)
             ax = self.fig.add_subplot(111)
             ax.plot(self.comprimentos_onda_mapeados, self.espectro, color='darkviolet')
-            ax.scatter(self.comprimentos_onda_mapeados[picos[0]], self.espectro[picos[0]], color='black', alpha = 1)
-            
+            ax.scatter(self.comprimentos_onda_mapeados[picos], self.espectro[picos], color='black')
             ax.set_xlabel("Comprimento de Onda (nm)")
             ax.set_ylabel("Intensidade Relativa")
-            ax.set_title("Espectro estimado (ponderado pela percepção humana)")
+            ax.set_title("Espectro Reconstruído")
             ax.set_xlim(380, 780)
             ax.grid(True, alpha=0.3)
             
@@ -177,12 +191,57 @@ class EspectroscopiaApp:
             self.canvas.draw()
             self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             
-            #self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
-            #self.toolbar.update()
+            self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
+            self.toolbar.update()
 
         except Exception as e:
-            tk.messagebox.showerror("Erro", f"Falha ao gerar espectro:\n{str(e)}")
+            tk.messagebox.showerror("Erro", f"Falha ao gerar espectro contínuo:\n{str(e)}")
+
+    def plotar_escala_cinza(self):
+
+        if self.canvas:
+            self.canvas.get_tk_widget().destroy()
+        if self.toolbar:
+            self.toolbar.destroy()
         
+        try:
+            
+            ls = colour.SDS_LIGHT_SOURCES["Mercury"]
+            ls = ls.align(colour.SpectralShape(380,780, ((780.0 - 380.0) / (float(self.largura) - 1.0))))            
+            
+            img = cv2.cvtColor(self.img_arr, cv2.COLOR_BGR2GRAY)
+            img = cv2.medianBlur(img, 3)
+            img = cv2.normalize(img, None, 0, 255, cv2.NORM_MINMAX)
+
+            self.img2 = Image.fromarray(img)
+            self.img2 = self.img2.resize((775, 45))
+            
+            imagetk = ImageTk.PhotoImage(image=self.img2)                
+            self.label_imagem.config(image=imagetk)
+            self.label_imagem.image = imagetk    
+            
+            perfil = np.mean(img, axis=0)
+                
+            self.fig = plt.Figure(figsize=(9, 4), dpi=100)
+            ax = self.fig.add_subplot(111)
+            ax.plot(self.comprimentos_onda_mapeados, (perfil / np.max(perfil)), color='gray')
+            ax.plot(ls.domain, ls.range, color='red', label = 'Espectro Mercúrio')
+            ax.set_xlabel("Comprimento de Onda (nm)")
+            ax.set_ylabel("Intensidade Relativa")
+            ax.set_title("Espectro Cinza")
+            ax.set_xlim(380, 780)
+            ax.grid(True, alpha=0.3)
+            
+            self.canvas = FigureCanvasTkAgg(self.fig, master=self.frame_graph)
+            self.canvas.draw()
+            self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            
+            self.toolbar = NavigationToolbar2Tk(self.canvas, self.frame_graph)
+            self.toolbar.update()
+             
+        except Exception as e:
+            tk.messagebox.showerror("Erro", f"Falha ao gerar espectro cinza:\n{str(e)}")
+                    
     def extrair_dados(self):
         self.status_label.config(text="Exportando CSV...")
 
